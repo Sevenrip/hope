@@ -1,8 +1,8 @@
-#include "hope/SystemManager.hpp"
+#include "hope/SystemsManager.hpp"
 
 namespace hope {
 
-void SystemManager::updateAll(double dt) {
+void SystemsManager::updateAll(double dt) {
     for(auto system : _systems) {
         system->update(_entityManager, dt);
     }

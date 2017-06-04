@@ -2,9 +2,4 @@
 
 namespace hope {
 
-Entity EntityManager::creatEntity() {
-
-}
-
-
 }
