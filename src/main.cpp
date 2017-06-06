@@ -17,7 +17,5 @@ int main() {
     hope::SystemsManager manager;
 
     hope::Entity entity = manager.entities().createEntityWithComponents(A{}, B{});
-    ComponentHandler<C> a = entity.getComponent<C>();
-    std::cout << "fodasse" << std::endl;
     return 0;
 }

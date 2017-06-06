@@ -2,52 +2,57 @@
 
 #include <cassert>
 #include <bitset>
+#include <vector>
 
 #include "Config.hpp"
 #include "utils/IdGenerator.hpp"
-#include <iostream>
+
+
 
 namespace hope {
 
+class EntityManager;
 struct ComponentTag {};
 
-template<typename T>
-struct ComponentHandler {};
 template<typename T>
 using ComponentIdGenerator = utils::UniqueIdPerBaseGenerator<T, ComponentTag>;
 
 class Entity {
 public:
-
     template<typename Component, typename ...Args>
     void addComponent(Args... args) {
-        _componentsMask.set(ComponentIdGenerator<Component>::GetGeneratedId());
-        std::cout << typeid(Component).name() << " " << ComponentIdGenerator<Component>::GetGeneratedId() << std::endl;
+        //_manager.createComponent<Component>(_id, std::forward<Args>(args)...);
     }
 
     template<typename Component>
-    void removeComponent() {};
+    void removeComponent() {
+        //_manager.removeComponent<Component>(_id);
+    };
+
+    /*template<typename Component>
+    ComponentHandle<Component> component() {
+        auto id = ComponentIdGenerator<Component>::AssignedId();
+        return ComponentHandler<Component>(_manager, _manager.component<Component>(_id), _id);
+    }*/
 
     template<typename Component>
-    ComponentHandler<Component> getComponent() {
-        auto id = ComponentIdGenerator<Component>::GetGeneratedId();
-        assert((_componentsMask[id] == 1) && "No component ");
-        return ComponentHandler<Component>{};
+    bool hasComponent() {
+        auto maskBit = ComponentIdGenerator<Component>::AssignedId();
+        return  this->componentsMask().at(_id).test(maskBit);
     }
 
-    template<typename Component>
-    ComponentHandler<Component> hasComponent() {
-        auto id = ComponentIdGenerator<Component>::GetGeneratedId();
-        return ComponentHandler<Component>{};
-    }
+    std::vector<std::bitset<MAX_COMPONENTS>> componentsMask() const;     
+    
+
+    Id id() const { return _id;}
 
     void destroy() {};
 
 private:
+    Entity(EntityManager & manager, Id id) : _manager(manager), _id(id) {}
     Entity() = default;
-    Entity(Id id) : _id(id) {}
 
-    std::bitset<MAX_COMPONENTS> _componentsMask;
+    EntityManager & _manager;
     Id _id;
 
     friend class EntityManager;

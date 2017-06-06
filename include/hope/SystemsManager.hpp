@@ -30,7 +30,7 @@ public:
     
     template <typename T>
     void update(double dt) {
-        auto id = SystemIdGenerator<T>::GetGeneratedId();
+        auto id = SystemIdGenerator<T>::AssignedId();
         _systems[id]->update(_entityManager, dt);
     }
 
