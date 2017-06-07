@@ -1,12 +1,54 @@
 #pragma once
 
 #include <vector>
+#include <bitset>
 
 #include "utils/IdGenerator.hpp"
 #include "memory/MemoryPool.hpp"
-#include "Entity.hpp"
+
 
 namespace hope {
+
+class EntityManager;
+
+struct ComponentTag {};
+
+template<typename T>
+using ComponentIdGenerator = utils::UniqueIdPerBaseGenerator<T, ComponentTag>;
+
+class Entity {
+public:
+    template<typename Component, typename ...Args>
+    void addComponent(Args... args);
+
+    template<typename Component>
+    void removeComponent();
+
+    template<typename Component>
+    bool hasComponent() const;        
+
+    /*template<typename Component>
+    ComponentHandle<Component> component() {
+        auto id = ComponentIdGenerator<Component>::AssignedId();
+        return ComponentHandler<Component>(_manager, _manager.component<Component>(_id), _id);
+    }*/
+
+    std::vector<std::bitset<MAX_COMPONENTS>> componentsMask() const;     
+    
+
+    Id id() const { return _id;}
+
+    void destroy() {};
+
+private:
+    Entity(EntityManager & manager, Id id) : _manager(manager), _id(id) {}
+    Entity() = default;
+
+    EntityManager & _manager;
+    Id _id;
+
+    friend class EntityManager;
+};    
 
 class EntityManager : private utils::IncrementalIdGenerator<EntityManager> {
 public:
@@ -63,4 +105,32 @@ private:
 
     friend class Entity;
 };
+
+
+template<typename Component, typename ...Args>
+void Entity::addComponent(Args... args) {
+    _manager.createComponent<Component>(_id, std::forward<Args>(args)...);
+}
+
+template<typename Component>
+void Entity::removeComponent() {
+    _manager.removeComponent<Component>(_id);
+};
+
+/*template<typename Component>
+ComponentHandle<Component> component() {
+    auto id = ComponentIdGenerator<Component>::AssignedId();
+    return ComponentHandler<Component>(_manager, _manager.component<Component>(_id), _id);
+}*/
+
+template<typename Component>
+bool Entity::hasComponent() const {
+    auto maskBit = ComponentIdGenerator<Component>::AssignedId();
+    return  this->componentsMask().at(_id).test(maskBit);
+}
+
+std::vector<std::bitset<MAX_COMPONENTS>> Entity::componentsMask() const {
+    return _manager.componentsMask();
+}
+
 }

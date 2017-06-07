@@ -17,6 +17,8 @@
         "__locale": "cpp",
         "locale": "cpp",
         "bitset": "cpp",
-        "iostream": "cpp"
+        "iostream": "cpp",
+        "map": "cpp",
+        "unordered_map": "cpp"
     }
 }
