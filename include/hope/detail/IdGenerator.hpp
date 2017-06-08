@@ -3,7 +3,7 @@
 #include "../Config.hpp"
 
 namespace hope {
-namespace utils {
+namespace detail {
     
 template<typename Tag>
 struct UniqueIdHolder{

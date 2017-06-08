@@ -3,23 +3,21 @@
 #include <vector>
 #include <memory>
 
-#include "EntityManager.hpp"
 #include "System.hpp"
-#include "Config.hpp"
-#include "utils/IdGenerator.hpp"
+#include "detail/IdGenerator.hpp"
 
 namespace hope {
 
 struct SystemTag {};
 
 template<typename T>
-using SystemIdGenerator = utils::UniqueIdPerBaseGenerator<T, SystemTag>;
+using SystemIdGenerator = detail::UniqueIdPerBaseGenerator<T, SystemTag>;
 
 class SystemsManager {
 public:
     SystemsManager() = default;
 
-    EntityManager & entities() { return _entityManager; }
+    EntityManager & entities();
     
     void updateAll(double dt);
 

@@ -3,18 +3,26 @@
 #include <vector>
 #include <bitset>
 
-#include "utils/IdGenerator.hpp"
-#include "memory/MemoryPool.hpp"
+#include "detail/IdGenerator.hpp"
+#include "detail/MemoryPool.hpp"
 
 
 namespace hope {
 
 class EntityManager;
+class Entity;
+
+struct ComponentHandle {
+    ComponentHandle(EntityManager & , Entity * ) {}//  : _manager(manager), _entity(entity) {}
+    private:
+       // EntityManager & _manager;
+        //Entity * _entity = nullptr;
+};
 
 struct ComponentTag {};
 
 template<typename T>
-using ComponentIdGenerator = utils::UniqueIdPerBaseGenerator<T, ComponentTag>;
+using ComponentIdGenerator = detail::UniqueIdPerBaseGenerator<T, ComponentTag>;
 
 class Entity {
 public:
@@ -33,7 +41,7 @@ public:
         return ComponentHandler<Component>(_manager, _manager.component<Component>(_id), _id);
     }*/
 
-    std::vector<std::bitset<MAX_COMPONENTS>> componentsMask() const;     
+    std::vector<ComponentsMask> componentsMask() const;     
     
 
     Id id() const { return _id;}
@@ -48,16 +56,48 @@ private:
     Id _id;
 
     friend class EntityManager;
-};    
+};
 
-class EntityManager : private utils::IncrementalIdGenerator<EntityManager> {
+namespace detail {
+
+struct ComponentHelper {
+    virtual void removeComponent(Entity & entity) = 0;
+
+};
+
+template<typename Component>
+struct TypedComponentHelper : ComponentHelper {
+    virtual void removeComponent(Entity & entity) final {
+        entity.removeComponent<Component>();
+    }
+}; 
+
+}   
+
+class EntityManager : private detail::IncrementalIdGenerator<EntityManager> {
 public:
-    EntityManager() : _components(MAX_COMPONENTS) {}
+    EntityManager() : _componentsMem(MAX_COMPONENTS) {}
 
     Entity createEntity() {
-        auto id = GenerateId();
-        Entity entity(const_cast<EntityManager&>(*this),id);
-        _entities.push_back(id);
+        const std::pair<Id,bool> result = [this]() -> std::pair<Id,bool> {
+            if(_recycledEntities.empty()) {
+                return {GenerateId(), true};
+            }
+            else {
+                Id id = _recycledEntities.back();
+                _recycledEntities.pop_back();
+                return {id, false};
+            }
+        }();
+        //if new id
+        if(result.second) {
+             _entities.push_back(true);
+        }
+        else {
+            _entities[result.first] = true;
+        }
+       
+        Entity entity(const_cast<EntityManager&>(*this),result.first);
         return entity;
     }
 
@@ -65,8 +105,20 @@ public:
     Entity createEntityWithComponents(Components&& ...components) {
         Entity entity = createEntity();
         (void) (int[]){ (createComponent<Components>(entity.id(), std::forward<Components>(components)),0)... };
-        _entities.push_back(entity.id());
+        _entities.push_back(true);
         return entity;
+    }
+
+    void deleteEntity(Id id) {
+        ComponentsMask mask = _componentsMask[id];
+        _entities[id] = false;
+        for(auto i = 0; i < _nrOfComponentTypesUsed; i++) {
+            if(mask.test(i)) {
+                Entity entity(const_cast<EntityManager&>(*this),id);
+                _componentsHelpers[i]->removeComponent(entity);
+            }
+        }
+        _recycledEntities.push_back(id);
     }
 
 private:
@@ -77,14 +129,19 @@ private:
         if(!_componentsMask[id].test(componentId)) {
             return nullptr;
         }
-        return static_cast<Component*>(_components[id].getElementMem<Component>(id));
+        return static_cast<Component*>(_componentsMem[id]->getElementMem(id));
     }
 
     template<typename Component, typename ...Args>
     void createComponent(Id id, Args ...args) {
         auto componentId = ComponentIdGenerator<Component>::AssignedId();
+
+        if(_nrOfComponentTypesUsed >= componentId) { //new Component Type being added
+            _nrOfComponentTypesUsed++;
+            _componentsHelpers.push_back(new detail::TypedComponentHelper<Component>());
+        }
          _componentsMask[id].set(componentId);
-        new (_components[id].getElementMem<Component>(id)) Component(std::forward<Args>(args)...);
+        new (_componentsMem[id]->getElementMem(id)) Component(std::forward<Args>(args)...);
     }
 
     template<typename Component>
@@ -93,20 +150,25 @@ private:
             if(!_componentsMask[id].test(componentId)) {
             return;
         }        
-        _componentsMask[id].set(componentId);
-        _components[id].deleteElement<Component>(id);
+        _componentsMask[id].reset(componentId);
+        _componentsMem[id]->deleteElement(id);
     }
 
-    std::vector<std::bitset<MAX_COMPONENTS>> componentsMask() const { return _componentsMask;}
+    std::vector<ComponentsMask> componentsMask() const { return _componentsMask;}
 
-    std::vector<Id> _entities;
-    std::vector<std::bitset<MAX_COMPONENTS>> _componentsMask;
-    std::vector<mem::MemoryPool> _components;
+    std::vector<bool> _entities;
+    std::vector<Id> _recycledEntities;
+    std::vector<detail::ComponentHelper*> _componentsHelpers; 
+    std::vector<ComponentsMask> _componentsMask;
+    std::vector<detail::BaseMemoryPool*> _componentsMem;
+
+    Id _nrOfComponentTypesUsed = 0;
 
     friend class Entity;
 };
 
 
+//Entity Implementation
 template<typename Component, typename ...Args>
 void Entity::addComponent(Args... args) {
     _manager.createComponent<Component>(_id, std::forward<Args>(args)...);
@@ -129,8 +191,6 @@ bool Entity::hasComponent() const {
     return  this->componentsMask().at(_id).test(maskBit);
 }
 
-std::vector<std::bitset<MAX_COMPONENTS>> Entity::componentsMask() const {
-    return _manager.componentsMask();
-}
+
 
 }

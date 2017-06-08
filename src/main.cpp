@@ -1,4 +1,3 @@
-#include <hope/System.hpp>
 #include <hope/SystemsManager.hpp>
 #include <iostream>
 
@@ -17,5 +16,6 @@ int main() {
     hope::SystemsManager manager;
 
     hope::Entity entity = manager.entities().createEntityWithComponents(A{}, B{});
+    
     return 0;
 }
