@@ -7,7 +7,7 @@ class BaseMemoryPool {
 public:
     BaseMemoryPool(size_t typeSize) : _typeSize(typeSize), _memory(new char[1024]) {};
 
-    char * getElementMem(Id index) {
+    void * getElementMem(Id index) {
         auto memOffset = index * _typeSize;
         return _memory + memOffset;
     }
@@ -26,7 +26,7 @@ public:
 
     virtual void deleteElement(Id index) final {
         auto memOffset = index * _typeSize;
-        T * ptr = static_cast<T*>(_memory + memOffset);
+        T * ptr = reinterpret_cast<T*>(_memory + memOffset);
         ptr->~T();
     }
 };
