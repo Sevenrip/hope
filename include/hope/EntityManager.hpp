@@ -12,11 +12,18 @@ namespace hope {
 class EntityManager;
 class Entity;
 
-struct ComponentHandle {
-    ComponentHandle(EntityManager & , Entity * ) {}//  : _manager(manager), _entity(entity) {}
-    private:
-       // EntityManager & _manager;
-        //Entity * _entity = nullptr;
+template<typename Component>
+class ComponentHandle {
+public:
+    ComponentHandle(EntityManager & manager, const Entity * entity, Component * component)  
+    : _manager(manager), _component(component), _entity(entity) {}
+
+    Component * operator->() const { return _component;}
+
+private:
+        EntityManager & _manager;
+        Component * _component = nullptr;
+        const Entity * _entity = nullptr;
 };
 
 struct ComponentTag {};
@@ -35,18 +42,13 @@ public:
     template<typename Component>
     bool hasComponent() const;        
 
-    /*template<typename Component>
-    ComponentHandle<Component> component() {
-        auto id = ComponentIdGenerator<Component>::AssignedId();
-        return ComponentHandler<Component>(_manager, _manager.component<Component>(_id), _id);
-    }*/
-
+    template<typename Component>
+    ComponentHandle<Component> component() const;
     std::vector<ComponentsMask> componentsMask() const;     
-    
 
-    Id id() const { return _id;}
+    Id id() const;
 
-    void destroy() {};
+    void destroy();
 
 private:
     Entity(EntityManager & manager, Id id) : _manager(manager), _id(id) {}
@@ -62,7 +64,6 @@ namespace detail {
 
 struct ComponentHelper {
     virtual void removeComponent(Entity & entity) = 0;
-
 };
 
 template<typename Component>
@@ -71,12 +72,11 @@ struct TypedComponentHelper : ComponentHelper {
         entity.removeComponent<Component>();
     }
 }; 
-
 }   
 
 class EntityManager : private detail::IncrementalIdGenerator<EntityManager> {
 public:
-    EntityManager() : _componentsMem(MAX_COMPONENTS) {}
+    EntityManager()  { _componentsMem.reserve(MAX_COMPONENTS); }
 
     Entity createEntity() {
         const std::pair<Id,bool> result = [this]() -> std::pair<Id,bool> {
@@ -89,9 +89,10 @@ public:
                 return {id, false};
             }
         }();
-        //if new id
-        if(result.second) {
+     
+        if(result.second) {  //if new id
              _entities.push_back(true);
+             _componentsMask.emplace_back();
         }
         else {
             _entities[result.first] = true;
@@ -122,7 +123,6 @@ public:
     }
 
 private:
-
     template<typename Component>
     Component * component(Id id) {
         auto componentId = ComponentIdGenerator<Component>::AssignedId();
@@ -138,10 +138,12 @@ private:
 
         if(_nrOfComponentTypesUsed >= componentId) { //new Component Type being added
             _nrOfComponentTypesUsed++;
-            _componentsHelpers.push_back(new detail::TypedComponentHelper<Component>());
+            _componentsHelpers.push_back(std::make_unique<detail::TypedComponentHelper<Component>>());
+            _componentsMem[componentId] = std::make_unique<detail::MemoryPool<Component>>(); 
+               
         }
-         _componentsMask[id].set(componentId);
         new (_componentsMem[id]->getElementMem(id)) Component(std::forward<Args>(args)...);
+        _componentsMask[id].set(componentId);
     }
 
     template<typename Component>
@@ -158,9 +160,9 @@ private:
 
     std::vector<bool> _entities;
     std::vector<Id> _recycledEntities;
-    std::vector<detail::ComponentHelper*> _componentsHelpers; 
+    std::vector<std::unique_ptr<detail::ComponentHelper>> _componentsHelpers; 
     std::vector<ComponentsMask> _componentsMask;
-    std::vector<detail::BaseMemoryPool*> _componentsMem;
+    std::vector<std::unique_ptr<detail::BaseMemoryPool>> _componentsMem;
 
     Id _nrOfComponentTypesUsed = 0;
 
@@ -179,18 +181,15 @@ void Entity::removeComponent() {
     _manager.removeComponent<Component>(_id);
 };
 
-/*template<typename Component>
-ComponentHandle<Component> component() {
-    auto id = ComponentIdGenerator<Component>::AssignedId();
-    return ComponentHandler<Component>(_manager, _manager.component<Component>(_id), _id);
-}*/
+template<typename Component>
+ComponentHandle<Component> Entity::component() const {
+    return ComponentHandle<Component>(_manager, this, _manager.component<Component>(_id));
+}
 
 template<typename Component>
 bool Entity::hasComponent() const {
     auto maskBit = ComponentIdGenerator<Component>::AssignedId();
     return  this->componentsMask().at(_id).test(maskBit);
 }
-
-
 
 }

@@ -10,12 +10,11 @@ struct UniqueIdHolder{
     static Id s_Id;
 };
 
-
 template<typename Tag>
 Id UniqueIdHolder<Tag>::s_Id = 0;
 
 template<typename T, typename Base>
-struct UniqueIdPerBaseGenerator : UniqueIdHolder<Base> {
+struct UniqueIdPerBaseGenerator {
     static Id AssignedId() {
         static Id id = UniqueIdHolder<Base>::s_Id++;
         return id;
