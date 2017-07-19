@@ -19,6 +19,8 @@
         "bitset": "cpp",
         "iostream": "cpp",
         "map": "cpp",
-        "unordered_map": "cpp"
+        "unordered_map": "cpp",
+        "cmakeccompilerid.c": "cpp",
+        "utility": "cpp"
     }
 }
