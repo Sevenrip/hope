@@ -2,9 +2,14 @@
 
 #include <vector>
 #include <bitset>
+#include <functional>
+#include <type_traits>
+
+#include <iostream>
 
 #include "detail/IdGenerator.hpp"
 #include "detail/MemoryPool.hpp"
+#include "detail/MetaUtils.hpp"
 
 
 namespace hope {
@@ -105,7 +110,7 @@ public:
     template<typename ...Components>
     Entity createEntityWithComponents(Components&& ...components) {
         Entity entity = createEntity();
-        (void) (int[]){ (createComponent<Components>(entity.id(), std::forward<Components>(components)),0)... };
+        (void) (int[]){ (addComponent<Components>(entity.id(), std::forward<Components>(components)),0)... };
         _entities.push_back(true);
         return entity;
     }
@@ -122,26 +127,62 @@ public:
         _recycledEntities.push_back(id);
     }
 
+    template<typename ...Components>
+    void forEach(typename detail::identity<const std::function<void(Components&...)> &>::type f) {
+        for(size_t id = 0; id < _entities.size(); id++) {
+            if(!_entities[id]) {
+                continue;
+            }
+
+            auto mask = _componentsMask[id];
+            if(mask != maskFromComponents<Components...>()) {
+                continue;
+            }
+  
+            detail::callFunctionWithTupleAsArgs(f, makeComponentsTuple<Components...>(id));     
+        }
+    }
+
+   const std::vector<bool>& entities() const { return _entities; }
+
 private:
+    template<typename ...Components>
+    ComponentsMask maskFromComponents() {
+        ComponentsMask mask;
+        (void) (int[]){ (mask.set(ComponentIdGenerator<Components>::AssignedId()),0)... };
+        return mask;
+    }
+
+    template<typename ...Components>
+    decltype(auto) makeComponentsTuple(Id id) {
+        return std::make_tuple(componentRef<Components>(id)...);
+    }
+
     template<typename Component>
     Component * component(Id id) {
-        auto componentId = ComponentIdGenerator<Component>::AssignedId();
+        using DecayedComponentType = std::decay_t<Component>;
+        auto componentId = ComponentIdGenerator<DecayedComponentType>::AssignedId();
         if(!_componentsMask[id].test(componentId)) {
             return nullptr;
         }
-        return static_cast<Component*>(_componentsMem[id]->getElementMem(id));
+        return static_cast<DecayedComponentType*>(_componentsMem[id]->getElementMem(id));
+    }
+
+    template<typename Component>
+    std::decay_t<Component>& componentRef(Id id) {
+        return *component<Component>(id); 
     }
 
     template<typename Component, typename ...Args>
-    void createComponent(Id id, Args ...args) {
+    void addComponent(Id id, Args ...args) {
         auto componentId = ComponentIdGenerator<Component>::AssignedId();
 
         if(_nrOfComponentTypesUsed >= componentId) { //new Component Type being added
             _nrOfComponentTypesUsed++;
             _componentsHelpers.push_back(std::make_unique<detail::TypedComponentHelper<Component>>());
-            _componentsMem[componentId] = std::make_unique<detail::MemoryPool<Component>>(); 
-               
+            _componentsMem.push_back(std::make_unique<detail::MemoryPool<Component>>()); 
         }
+        
         new (_componentsMem[id]->getElementMem(id)) Component(std::forward<Args>(args)...);
         _componentsMask[id].set(componentId);
     }
@@ -173,7 +214,7 @@ private:
 //Entity Implementation
 template<typename Component, typename ...Args>
 void Entity::addComponent(Args... args) {
-    _manager.createComponent<Component>(_id, std::forward<Args>(args)...);
+    _manager.addComponent<Component>(_id, std::forward<Args>(args)...);
 }
 
 template<typename Component>

@@ -14,9 +14,10 @@ struct SA : public hope::System {
 
 int main() {
     hope::SystemsManager manager;
-
     hope::Entity entity = manager.entities().createEntityWithComponents(A{2}, B{}, C{});
+    manager.entities().forEach<A,B,C>([](A& a, B& b, C& c) {
+        std::cout << a._i << std::endl;
+    });
     auto a = entity.component<A>();
-    std::cout << a->_i << std::endl;
     return 0;
 }

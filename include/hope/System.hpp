@@ -7,9 +7,9 @@ namespace hope {
 
 class System  {
 public:
-    virtual void update(EntityManager &entities, TimeDt dt) = 0;
+    virtual void update(EntityManager &em, TimeDt dt) = 0;
     virtual void configure() {}
-
+    
     friend class SystemManager;
 
 };

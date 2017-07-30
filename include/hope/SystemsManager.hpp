@@ -17,7 +17,7 @@ class SystemsManager {
 public:
     SystemsManager() = default;
 
-    EntityManager & entities();
+    EntityManager & entityManager();
     
     void updateAll(double dt);
 
@@ -31,6 +31,8 @@ public:
         auto id = SystemIdGenerator<T>::AssignedId();
         _systems[id]->update(_entityManager, dt);
     }
+
+    EntityManager & entities();
 
 private:
     EntityManager _entityManager;
